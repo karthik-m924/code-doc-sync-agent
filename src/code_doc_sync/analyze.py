@@ -17,6 +17,11 @@ status that should follow from the evidence. Do not claim that Jira was updated.
 Write a concise Confluence change summary and a list of exact documentation
 changes. Do not claim that Confluence was updated. These are Phase 1 suggestions
 that a human will review on the GitHub pull request.
+
+Also produce a three-area dashboard for Jira, Confluence, and Tests. For each
+area, assign a consistency status and write one short summary, the exact
+inconsistency, and the required update. Keep every dashboard field brief enough
+to scan in a GitHub pull-request table.
 """.strip()
 
 

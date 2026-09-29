@@ -75,10 +75,24 @@ class ConfluenceSuggestion(BaseModel):
     proposed_changes: list[str]
 
 
+class AreaAssessment(BaseModel):
+    status: ConsistencyStatus
+    summary: str
+    inconsistency: str
+    required_update: str
+
+
+class SyncDashboard(BaseModel):
+    jira: AreaAssessment
+    confluence: AreaAssessment
+    tests: AreaAssessment
+
+
 class AnalysisReport(BaseModel):
     overall_status: ConsistencyStatus
     change_summary: str
     findings: list[ConsistencyFinding]
     recommended_actions: list[str]
+    dashboard: SyncDashboard
     jira_suggestion: JiraSuggestion
     confluence_suggestion: ConfluenceSuggestion

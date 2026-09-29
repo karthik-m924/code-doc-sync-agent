@@ -2,6 +2,7 @@ from code_doc_sync.collect import derive_issue_key
 from code_doc_sync.github_review import COMMENT_MARKER, render_review
 from code_doc_sync.models import (
     AnalysisReport,
+    AreaAssessment,
     ChangePacket,
     CodeChange,
     ConfluenceSuggestion,
@@ -10,6 +11,7 @@ from code_doc_sync.models import (
     Evidence,
     JiraSuggestion,
     Severity,
+    SyncDashboard,
 )
 
 
@@ -60,6 +62,26 @@ def test_review_contains_human_approval_proposals() -> None:
             )
         ],
         recommended_actions=["Update documentation and tests."],
+        dashboard=SyncDashboard(
+            jira=AreaAssessment(
+                status=ConsistencyStatus.INCONSISTENT,
+                summary="Work remains.",
+                inconsistency="The story is not ready to close.",
+                required_update="Add the suggested comment and retain In Progress.",
+            ),
+            confluence=AreaAssessment(
+                status=ConsistencyStatus.INCONSISTENT,
+                summary="Design is stale.",
+                inconsistency="preferredLanguage is absent.",
+                required_update="Add the field and fallback behavior.",
+            ),
+            tests=AreaAssessment(
+                status=ConsistencyStatus.MISSING_EVIDENCE,
+                summary="Coverage is incomplete.",
+                inconsistency="Required cases are absent.",
+                required_update="Add present, missing, and null cases.",
+            ),
+        ),
         jira_suggestion=JiraSuggestion(
             comment="Implementation found; documentation and tests need updates.",
             suggested_status="In Progress",
@@ -74,7 +96,11 @@ def test_review_contains_human_approval_proposals() -> None:
     review = render_review(packet, report)
 
     assert COMMENT_MARKER in review
-    assert "## Proposed Jira Update" in review
+    assert "# Delivery Sync Dashboard" in review
+    assert "| Jira |" in review
+    assert "| Confluence |" in review
+    assert "| Tests |" in review
+    assert "<summary><strong>Proposed Jira update</strong></summary>" in review
     assert "**Suggested status:** In Progress" in review
-    assert "## Proposed Confluence Update" in review
+    assert "<summary><strong>Proposed Confluence update</strong></summary>" in review
     assert "Suggestion only" in review

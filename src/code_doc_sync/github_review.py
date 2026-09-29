@@ -2,31 +2,55 @@ import json
 import urllib.error
 import urllib.request
 
-from code_doc_sync.models import AnalysisReport, ChangePacket
+from code_doc_sync.models import AnalysisReport, ChangePacket, ConsistencyStatus
 
 
 COMMENT_MARKER = "<!-- code-doc-sync-agent -->"
 
 
 def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
-    status = report.overall_status.value.replace("_", " ").upper()
+    rows = (
+        ("Jira", report.dashboard.jira),
+        ("Confluence", report.dashboard.confluence),
+        ("Tests", report.dashboard.tests),
+    )
     lines = [
         COMMENT_MARKER,
-        "# Code-Doc Sync Review",
+        "# Delivery Sync Dashboard",
         "",
-        f"**Result:** {status}",
+        f"**Overall:** {_status_badge(report.overall_status)}",
         "",
         report.change_summary,
         "",
-        "## Findings",
+        "| Area | Status | What is inconsistent | Required update |",
+        "|---|---|---|---|",
+        *[
+            "| "
+            + " | ".join(
+                (
+                    area,
+                    _status_badge(assessment.status),
+                    _table_text(assessment.inconsistency),
+                    _table_text(assessment.required_update),
+                )
+            )
+            + " |"
+            for area, assessment in rows
+        ],
+        "",
+        "> [!NOTE]",
+        "> Suggestion only. Jira and Confluence have not been changed.",
+        "",
+        "<details>",
+        f"<summary><strong>Detailed findings and evidence ({len(report.findings)})</strong></summary>",
         "",
     ]
     for finding in report.findings:
         lines.extend(
             [
-                f"### {finding.title}",
+                f"#### {finding.title}",
                 f"**Severity:** {finding.severity.value.title()}  ",
-                f"**Status:** {finding.status.value.replace('_', ' ').title()}",
+                f"**Status:** {_status_badge(finding.status)}",
                 "",
                 finding.explanation,
                 "",
@@ -37,10 +61,12 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
                 "",
             ]
         )
+    lines.extend(["</details>", ""])
 
     lines.extend(
         [
-            "## Proposed Jira Update",
+            "<details>",
+            "<summary><strong>Proposed Jira update</strong></summary>",
             "",
             f"**Issue:** [{packet.issue.identifier}]({packet.issue.url})  ",
             f"**Suggested status:** {report.jira_suggestion.suggested_status}",
@@ -51,7 +77,10 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
             "",
             f"**Rationale:** {report.jira_suggestion.rationale}",
             "",
-            "## Proposed Confluence Update",
+            "</details>",
+            "",
+            "<details>",
+            "<summary><strong>Proposed Confluence update</strong></summary>",
             "",
             f"**Page:** [{packet.design_document.title}]({packet.design_document.url})",
             "",
@@ -62,14 +91,34 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
                 for change in report.confluence_suggestion.proposed_changes
             ],
             "",
-            "## Recommended Actions",
+            "</details>",
+            "",
+            "<details>",
+            "<summary><strong>Recommended actions</strong></summary>",
             "",
             *[f"- {action}" for action in report.recommended_actions],
             "",
-            "_Suggestion only. No Jira or Confluence content was changed._",
+            "</details>",
         ]
     )
     return "\n".join(lines)
+
+
+def _status_badge(status: ConsistencyStatus) -> str:
+    label, color = {
+        ConsistencyStatus.CONSISTENT: ("aligned", "2da44e"),
+        ConsistencyStatus.INCONSISTENT: ("out_of_sync", "cf222e"),
+        ConsistencyStatus.MISSING_EVIDENCE: ("evidence_missing", "bf8700"),
+    }[status]
+    alt = label.replace("_", " ").title()
+    return (
+        f"![{alt}](https://img.shields.io/badge/status-{label}-{color}"
+        "?style=flat-square)"
+    )
+
+
+def _table_text(value: str) -> str:
+    return " ".join(value.split()).replace("|", "\\|")
 
 
 def upsert_pull_request_comment(
