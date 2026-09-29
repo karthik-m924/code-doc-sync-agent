@@ -1,0 +1,84 @@
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class ConsistencyStatus(str, Enum):
+    CONSISTENT = "consistent"
+    INCONSISTENT = "inconsistent"
+    MISSING_EVIDENCE = "missing_evidence"
+
+
+class Severity(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class Evidence(BaseModel):
+    source: str
+    identifier: str
+    title: str
+    url: str | None = None
+    content: str
+
+
+class ChangedFile(BaseModel):
+    path: str
+    status: str
+    patch: str = ""
+
+
+class CodeChange(BaseModel):
+    repository: str
+    commit_sha: str
+    commit_message: str
+    commit_url: str | None = None
+    pull_request_number: int | None = None
+    pull_request_title: str | None = None
+    pull_request_url: str | None = None
+    base_ref: str | None = None
+    head_ref: str | None = None
+    files: list[ChangedFile] = Field(default_factory=list)
+
+
+class ChangePacket(BaseModel):
+    issue: Evidence
+    design_document: Evidence
+    code_change: CodeChange
+    test_artifacts: list[Evidence] = Field(default_factory=list)
+
+
+class RuleFinding(BaseModel):
+    rule: str
+    status: ConsistencyStatus
+    explanation: str
+
+
+class ConsistencyFinding(BaseModel):
+    title: str
+    severity: Severity
+    status: ConsistencyStatus
+    explanation: str
+    evidence: list[str]
+    recommended_action: str
+
+
+class JiraSuggestion(BaseModel):
+    comment: str
+    suggested_status: str
+    rationale: str
+
+
+class ConfluenceSuggestion(BaseModel):
+    summary: str
+    proposed_changes: list[str]
+
+
+class AnalysisReport(BaseModel):
+    overall_status: ConsistencyStatus
+    change_summary: str
+    findings: list[ConsistencyFinding]
+    recommended_actions: list[str]
+    jira_suggestion: JiraSuggestion
+    confluence_suggestion: ConfluenceSuggestion

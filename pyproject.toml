@@ -1,0 +1,9 @@
+[project]
+name = "code-doc-sync-agent"
+version = "0.1.0"
+description = "Read-only agent that detects inconsistencies across code, Jira, Confluence, and tests."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
