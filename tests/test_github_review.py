@@ -4,6 +4,7 @@ from code_doc_sync.models import (
     AnalysisReport,
     AreaAssessment,
     ChangePacket,
+    CodeAssessment,
     CodeChange,
     ConfluenceSuggestion,
     ConsistencyFinding,
@@ -63,6 +64,14 @@ def test_review_contains_human_approval_proposals() -> None:
         ],
         recommended_actions=["Update documentation and tests."],
         dashboard=SyncDashboard(
+            code=CodeAssessment(
+                status=ConsistencyStatus.CONSISTENT,
+                changes=[
+                    "Added preferredLanguage to the Customer Profile response.",
+                    "Mapped it from preferred_language with an en default.",
+                ],
+                next_step="No code change is required.",
+            ),
             jira=AreaAssessment(
                 status=ConsistencyStatus.INCONSISTENT,
                 summary="Work remains.",
@@ -96,7 +105,10 @@ def test_review_contains_human_approval_proposals() -> None:
     review = render_review(packet, report)
 
     assert COMMENT_MARKER in review
-    assert "# Delivery Sync Dashboard" in review
+    assert "# PR Change Impact Review" in review
+    assert "| Code |" in review
+    assert "Added preferredLanguage" in review
+    assert "| Area | Status | What we found | Next step |" in review
     assert "| Jira |" in review
     assert "| Confluence |" in review
     assert "| Tests |" in review

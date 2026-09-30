@@ -9,33 +9,59 @@ COMMENT_MARKER = "<!-- code-doc-sync-agent -->"
 
 
 def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
+    code_changes = "<br>".join(
+        f"{index}. {_table_text(change)}"
+        for index, change in enumerate(report.dashboard.code.changes, start=1)
+    )
     rows = (
-        ("Jira", report.dashboard.jira),
-        ("Confluence", report.dashboard.confluence),
-        ("Tests", report.dashboard.tests),
+        (
+            "Code",
+            _status_badge(
+                report.dashboard.code.status, aligned_label="implemented"
+            ),
+            code_changes,
+            _table_text(report.dashboard.code.next_step),
+        ),
+        *[
+            (
+                area,
+                _status_badge(assessment.status),
+                _table_text(
+                    assessment.summary
+                    if assessment.status == ConsistencyStatus.CONSISTENT
+                    else assessment.inconsistency
+                ),
+                _table_text(assessment.required_update),
+            )
+            for area, assessment in (
+                ("Jira", report.dashboard.jira),
+                ("Confluence", report.dashboard.confluence),
+                ("Tests", report.dashboard.tests),
+            )
+        ],
     )
     lines = [
         COMMENT_MARKER,
-        "# Delivery Sync Dashboard",
+        "# PR Change Impact Review",
         "",
-        f"**Overall:** {_status_badge(report.overall_status)}",
+        f"**Overall:** {_status_badge(report.overall_status, inconsistent_label='action_required')}",
         "",
         report.change_summary,
         "",
-        "| Area | Status | What is inconsistent | Required update |",
+        "| Area | Status | What we found | Next step |",
         "|---|---|---|---|",
         *[
             "| "
             + " | ".join(
                 (
                     area,
-                    _status_badge(assessment.status),
-                    _table_text(assessment.inconsistency),
-                    _table_text(assessment.required_update),
+                    status,
+                    finding,
+                    next_step,
                 )
             )
             + " |"
-            for area, assessment in rows
+            for area, status, finding, next_step in rows
         ],
         "",
         "> [!NOTE]",
@@ -104,15 +130,20 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
     return "\n".join(lines)
 
 
-def _status_badge(status: ConsistencyStatus) -> str:
+def _status_badge(
+    status: ConsistencyStatus,
+    *,
+    aligned_label: str = "aligned",
+    inconsistent_label: str = "needs_update",
+) -> str:
     label, color = {
-        ConsistencyStatus.CONSISTENT: ("aligned", "2da44e"),
-        ConsistencyStatus.INCONSISTENT: ("out_of_sync", "cf222e"),
+        ConsistencyStatus.CONSISTENT: (aligned_label, "2da44e"),
+        ConsistencyStatus.INCONSISTENT: (inconsistent_label, "cf222e"),
         ConsistencyStatus.MISSING_EVIDENCE: ("evidence_missing", "bf8700"),
     }[status]
     alt = label.replace("_", " ").title()
     return (
-        f"![{alt}](https://img.shields.io/badge/status-{label}-{color}"
+        f"![{alt}](https://img.shields.io/badge/-{label}-{color}"
         "?style=flat-square)"
     )
 

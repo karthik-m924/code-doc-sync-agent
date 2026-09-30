@@ -82,7 +82,14 @@ class AreaAssessment(BaseModel):
     required_update: str
 
 
+class CodeAssessment(BaseModel):
+    status: ConsistencyStatus
+    changes: list[str]
+    next_step: str
+
+
 class SyncDashboard(BaseModel):
+    code: CodeAssessment
     jira: AreaAssessment
     confluence: AreaAssessment
     tests: AreaAssessment

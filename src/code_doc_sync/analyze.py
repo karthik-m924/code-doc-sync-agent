@@ -18,10 +18,18 @@ Write a concise Confluence change summary and a list of exact documentation
 changes. Do not claim that Confluence was updated. These are Phase 1 suggestions
 that a human will review on the GitHub pull request.
 
-Also produce a three-area dashboard for Jira, Confluence, and Tests. For each
-area, assign a consistency status and write one short summary, the exact
-inconsistency, and the required update. Keep every dashboard field brief enough
-to scan in a GitHub pull-request table.
+Also produce a four-area dashboard for Code, Jira, Confluence, and Tests.
+
+For Code, list each concrete change separately. State what was added or changed,
+where it changed, and the important behavior. Use short statements such as
+"Added preferredLanguage to the Customer Profile response" and "Defaults to en
+when preferred_language is missing". Do not describe unchanged code.
+
+For Jira, Confluence, and Tests, use simple everyday language. Each inconsistency
+and required update must be one short, direct sentence. Avoid abstract phrases
+such as "status lags", "retain open acceptance work", "artifacts", or
+"completion is unverified". Name the missing field, document section, test case,
+or status directly. Keep every dashboard cell easy to scan in a pull request.
 """.strip()
 
 
