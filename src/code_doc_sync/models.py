@@ -112,3 +112,13 @@ class AnalysisReport(BaseModel):
     dashboard: SyncDashboard
     jira_suggestion: JiraSuggestion
     confluence_suggestion: ConfluenceSuggestion
+
+
+class ApprovalPlan(BaseModel):
+    version: int = 1
+    pull_number: int
+    head_sha: str
+    jira_issue_key: str
+    confluence_page_id: str
+    jira_suggestion: JiraSuggestion
+    confluence_suggestion: ConfluenceSuggestion

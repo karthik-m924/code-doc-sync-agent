@@ -1,5 +1,11 @@
 from code_doc_sync.collect import derive_issue_key
-from code_doc_sync.github_review import COMMENT_MARKER, render_review
+from code_doc_sync.connectors.atlassian import apply_section_update
+from code_doc_sync.github_review import (
+    COMMENT_MARKER,
+    approval_plan_id,
+    decode_plan,
+    render_review,
+)
 from code_doc_sync.models import (
     AnalysisReport,
     AreaAssessment,
@@ -48,6 +54,7 @@ def test_review_contains_human_approval_proposals() -> None:
             repository="owner/repo",
             commit_sha="abc123",
             commit_message="SCRUM-5 Add preferred language",
+            pull_request_number=7,
         ),
     )
     report = AnalysisReport(
@@ -136,3 +143,24 @@ def test_review_contains_human_approval_proposals() -> None:
     assert "#### Current response structure" in review
     assert '````markdown\n{"preferredLanguage": "en"}\n````' in review
     assert "Suggestion only" in review
+    assert "Apply recommended changes" in review
+    assert "**Pull request number:** `7`" in review
+    plan = decode_plan(review)
+    assert plan.pull_number == 7
+    assert plan.head_sha == "abc123"
+    assert approval_plan_id(plan) in review
+
+
+def test_section_updates_are_scoped_and_strip_outer_fences() -> None:
+    content = "# Design\n\n## Response\n\nOld value\n\n## Tests\n\nKeep me\n"
+    update = ConfluenceSectionUpdate(
+        section="Response",
+        operation="replace",
+        content='```json\n{"preferredLanguage": "en"}\n```',
+    )
+
+    updated = apply_section_update(content, update)
+
+    assert '## Response\n\n{"preferredLanguage": "en"}' in updated
+    assert "```" not in updated
+    assert "## Tests\n\nKeep me" in updated

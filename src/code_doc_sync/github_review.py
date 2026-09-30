@@ -1,14 +1,38 @@
+import base64
+import hashlib
 import json
+import re
 import urllib.error
 import urllib.request
 
-from code_doc_sync.models import AnalysisReport, ChangePacket, ConsistencyStatus
+from code_doc_sync.models import (
+    AnalysisReport,
+    ApprovalPlan,
+    ChangePacket,
+    ConsistencyStatus,
+)
 
 
 COMMENT_MARKER = "<!-- code-doc-sync-agent -->"
+PLAN_MARKER_PATTERN = re.compile(r"<!-- code-doc-sync-plan:([A-Za-z0-9_-]+) -->")
+APPLIED_MARKER_PREFIX = "<!-- code-doc-sync-applied:"
 
 
 def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
+    plan = ApprovalPlan(
+        pull_number=packet.code_change.pull_request_number or 0,
+        head_sha=packet.code_change.commit_sha,
+        jira_issue_key=packet.issue.identifier,
+        confluence_page_id=packet.design_document.identifier,
+        jira_suggestion=report.jira_suggestion,
+        confluence_suggestion=report.confluence_suggestion,
+    )
+    encoded_plan = encode_plan(plan)
+    plan_id = approval_plan_id(plan)
+    repository = packet.code_change.repository
+    workflow_url = (
+        f"https://github.com/{repository}/actions/workflows/code-doc-sync.yml"
+    )
     code_changes = "<br>".join(
         f"{index}. {_table_text(change)}"
         for index, change in enumerate(report.dashboard.code.changes, start=1)
@@ -42,6 +66,7 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
     )
     lines = [
         COMMENT_MARKER,
+        f"<!-- code-doc-sync-plan:{encoded_plan} -->",
         "# PR Change Impact Review",
         "",
         f"**Overall:** {_status_badge(report.overall_status, inconsistent_label='action_required')}",
@@ -66,6 +91,16 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
         "",
         "> [!NOTE]",
         "> Suggestion only. Jira and Confluence have not been changed.",
+        "",
+        "## Apply recommended changes",
+        "",
+        f"[![Apply changes](https://img.shields.io/badge/Apply_recommended_changes-0969da?style=for-the-badge)]({workflow_url})",
+        "",
+        "Open the workflow, choose **Run workflow**, and enter:",
+        f"- **Pull request number:** `{plan.pull_number}`",
+        f"- **Plan ID:** `{plan_id}`",
+        "",
+        "> The plan is applied only if this PR still points to the reviewed commit.",
         "",
         "<details>",
         f"<summary><strong>Detailed findings and evidence ({len(report.findings)})</strong></summary>",
@@ -152,6 +187,25 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
     return "\n".join(lines)
 
 
+def approval_plan_id(plan: ApprovalPlan) -> str:
+    payload = plan.model_dump_json(exclude_none=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def encode_plan(plan: ApprovalPlan) -> str:
+    payload = plan.model_dump_json(exclude_none=True).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def decode_plan(body: str) -> ApprovalPlan:
+    match = PLAN_MARKER_PATTERN.search(body)
+    if not match:
+        raise ValueError("The PR review does not contain an approval plan.")
+    encoded = match.group(1)
+    encoded += "=" * (-len(encoded) % 4)
+    return ApprovalPlan.model_validate_json(base64.urlsafe_b64decode(encoded))
+
+
 def _status_badge(
     status: ConsistencyStatus,
     *,
@@ -218,6 +272,64 @@ def upsert_pull_request_comment(
             method="POST",
             payload={"body": body},
         )
+
+
+def get_pull_request_comment(
+    *, token: str, owner: str, repo: str, pull_number: int
+) -> str:
+    headers = _github_headers(token)
+    comments = _request_json(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{pull_number}/comments?per_page=100",
+        headers,
+    )
+    existing = next(
+        (comment for comment in comments if COMMENT_MARKER in comment.get("body", "")),
+        None,
+    )
+    if not existing:
+        raise ValueError("No Code-Doc Sync review was found on this pull request.")
+    return existing["body"]
+
+
+def get_pull_request_head_sha(
+    *, token: str, owner: str, repo: str, pull_number: int
+) -> str:
+    pull = _request_json(
+        f"https://api.github.com/repos/{owner}/{repo}/pulls/{pull_number}",
+        _github_headers(token),
+    )
+    return pull["head"]["sha"]
+
+
+def has_applied_plan(
+    *, token: str, owner: str, repo: str, pull_number: int, plan_id: str
+) -> bool:
+    comments = _request_json(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{pull_number}/comments?per_page=100",
+        _github_headers(token),
+    )
+    marker = f"{APPLIED_MARKER_PREFIX}{plan_id} -->"
+    return any(marker in comment.get("body", "") for comment in comments)
+
+
+def post_pull_request_comment(
+    *, token: str, owner: str, repo: str, pull_number: int, body: str
+) -> None:
+    _request_json(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{pull_number}/comments",
+        _github_headers(token),
+        method="POST",
+        payload={"body": body},
+    )
+
+
+def _github_headers(token: str) -> dict[str, str]:
+    return {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "code-doc-sync-agent",
+    }
 
 
 def _request_json(

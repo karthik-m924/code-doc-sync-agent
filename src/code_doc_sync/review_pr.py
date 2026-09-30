@@ -17,7 +17,11 @@ def _event_pull_number() -> int | None:
     if not event_path:
         return None
     event = json.loads(Path(event_path).read_text(encoding="utf-8"))
-    number = event.get("pull_request", {}).get("number") or event.get("number")
+    number = (
+        event.get("pull_request", {}).get("number")
+        or event.get("issue", {}).get("number")
+        or event.get("number")
+    )
     return int(number) if number else None
 
 

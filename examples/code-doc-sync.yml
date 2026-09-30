@@ -3,19 +3,49 @@ name: Code-Doc Sync Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Pull request number shown in the review
+        required: true
+        type: number
+      plan_id:
+        description: Plan ID shown in the review
+        required: true
+        type: string
 
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   validate:
     name: Code-Doc Sync
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Review code and documentation consistency
         uses: karthik-m924/code-doc-sync-agent@main
         with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          atlassian-site-url: ${{ vars.ATLASSIAN_SITE_URL }}
+          atlassian-email: ${{ secrets.ATLASSIAN_EMAIL }}
+          atlassian-api-token: ${{ secrets.ATLASSIAN_API_TOKEN }}
+          confluence-page-id: ${{ vars.CONFLUENCE_PAGE_ID }}
+          github-token: ${{ github.token }}
+
+  apply:
+    name: Apply approved Code-Doc Sync changes
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply Jira and Confluence updates
+        uses: karthik-m924/code-doc-sync-agent@main
+        with:
+          operation: apply
+          pull-number: ${{ inputs.pull_number }}
+          plan-id: ${{ inputs.plan_id }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           atlassian-site-url: ${{ vars.ATLASSIAN_SITE_URL }}
           atlassian-email: ${{ secrets.ATLASSIAN_EMAIL }}
