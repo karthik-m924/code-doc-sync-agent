@@ -92,31 +92,53 @@ def render_review(packet: ChangePacket, report: AnalysisReport) -> str:
     lines.extend(
         [
             "<details>",
-            "<summary><strong>Proposed Jira update</strong></summary>",
+            "<summary><strong>Copy-ready Jira update</strong></summary>",
             "",
             f"**Issue:** [{packet.issue.identifier}]({packet.issue.url})  ",
             f"**Suggested status:** {report.jira_suggestion.suggested_status}",
             "",
-            "**Suggested comment**",
+            "**Comment to paste**",
             "",
-            f"> {report.jira_suggestion.comment.replace(chr(10), chr(10) + '> ')}",
+            _code_block(report.jira_suggestion.comment),
+            "",
+            "**Acceptance checklist to paste**",
+            "",
+            _code_block(
+                "\n".join(
+                    f"- [ ] {item}"
+                    for item in report.jira_suggestion.acceptance_checklist
+                )
+            ),
             "",
             f"**Rationale:** {report.jira_suggestion.rationale}",
             "",
             "</details>",
             "",
             "<details>",
-            "<summary><strong>Proposed Confluence update</strong></summary>",
+            (
+                "<summary><strong>Copy-ready Confluence updates "
+                f"({len(report.confluence_suggestion.section_updates)} sections)"
+                "</strong></summary>"
+            ),
             "",
             f"**Page:** [{packet.design_document.title}]({packet.design_document.url})",
             "",
             report.confluence_suggestion.summary,
             "",
-            *[
-                f"- {change}"
-                for change in report.confluence_suggestion.proposed_changes
-            ],
-            "",
+        ]
+    )
+    for update in report.confluence_suggestion.section_updates:
+        lines.extend(
+            [
+                f"#### {update.section}",
+                f"**Action:** {update.operation.title()}",
+                "",
+                _code_block(update.content, language="markdown"),
+                "",
+            ]
+        )
+    lines.extend(
+        [
             "</details>",
             "",
             "<details>",
@@ -150,6 +172,10 @@ def _status_badge(
 
 def _table_text(value: str) -> str:
     return " ".join(value.split()).replace("|", "\\|")
+
+
+def _code_block(value: str, *, language: str = "text") -> str:
+    return f"````{language}\n{value.strip()}\n````"
 
 
 def upsert_pull_request_comment(

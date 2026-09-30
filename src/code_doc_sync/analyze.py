@@ -18,6 +18,16 @@ Write a concise Confluence change summary and a list of exact documentation
 changes. Do not claim that Confluence was updated. These are Phase 1 suggestions
 that a human will review on the GitHub pull request.
 
+The Jira suggestion must also contain a short acceptance checklist that can be
+copied into Jira. Each item must be a concrete remaining verification or update.
+
+For Confluence, return section-specific copy-ready updates. Name the existing
+section, select add, replace, or remove, and provide the exact content the user
+can paste. Preserve valid JSON and Markdown table formatting. Include only
+sections that actually need a change. For this page, consider the related Jira
+work item, response example, field mappings, test expectations, and document
+version. Do not use placeholders or instructions inside the copy-ready content.
+
 Also produce a four-area dashboard for Code, Jira, Confluence, and Tests.
 
 For Code, list each concrete change separately. State what was added or changed,

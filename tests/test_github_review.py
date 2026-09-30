@@ -6,6 +6,7 @@ from code_doc_sync.models import (
     ChangePacket,
     CodeAssessment,
     CodeChange,
+    ConfluenceSectionUpdate,
     ConfluenceSuggestion,
     ConsistencyFinding,
     ConsistencyStatus,
@@ -95,10 +96,26 @@ def test_review_contains_human_approval_proposals() -> None:
             comment="Implementation found; documentation and tests need updates.",
             suggested_status="In Progress",
             rationale="Acceptance criteria are not fully evidenced.",
+            acceptance_checklist=[
+                "Add tests for present and missing preferred_language values.",
+                "Update the technical design.",
+            ],
         ),
         confluence_suggestion=ConfluenceSuggestion(
             summary="Document the new response field.",
             proposed_changes=["Add preferredLanguage to the response example."],
+            section_updates=[
+                ConfluenceSectionUpdate(
+                    section="Current response structure",
+                    operation="replace",
+                    content='{"preferredLanguage": "en"}',
+                ),
+                ConfluenceSectionUpdate(
+                    section="Field mappings",
+                    operation="add",
+                    content="| preferredLanguage | preferred_language | Defaults to en |",
+                ),
+            ],
         ),
     )
 
@@ -112,7 +129,10 @@ def test_review_contains_human_approval_proposals() -> None:
     assert "| Jira |" in review
     assert "| Confluence |" in review
     assert "| Tests |" in review
-    assert "<summary><strong>Proposed Jira update</strong></summary>" in review
+    assert "<summary><strong>Copy-ready Jira update</strong></summary>" in review
     assert "**Suggested status:** In Progress" in review
-    assert "<summary><strong>Proposed Confluence update</strong></summary>" in review
+    assert "**Acceptance checklist to paste**" in review
+    assert "Copy-ready Confluence updates (2 sections)" in review
+    assert "#### Current response structure" in review
+    assert '````markdown\n{"preferredLanguage": "en"}\n````' in review
     assert "Suggestion only" in review

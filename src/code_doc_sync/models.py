@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -68,11 +69,19 @@ class JiraSuggestion(BaseModel):
     comment: str
     suggested_status: str
     rationale: str
+    acceptance_checklist: list[str]
+
+
+class ConfluenceSectionUpdate(BaseModel):
+    section: str
+    operation: Literal["add", "replace", "remove"]
+    content: str
 
 
 class ConfluenceSuggestion(BaseModel):
     summary: str
     proposed_changes: list[str]
+    section_updates: list[ConfluenceSectionUpdate]
 
 
 class AreaAssessment(BaseModel):
